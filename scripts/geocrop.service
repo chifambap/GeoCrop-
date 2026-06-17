@@ -1,0 +1,31 @@
+# /etc/systemd/system/geocrop.service
+# Enable:  sudo systemctl enable geocrop
+# Start:   sudo systemctl start geocrop
+
+[Unit]
+Description=Geo-Crop Collector — Gunicorn
+After=network.target postgresql.service
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/geocrop/backend
+EnvironmentFile=/var/www/geocrop/backend/.env
+
+ExecStart=/var/www/geocrop/venv/bin/gunicorn \
+    --workers ${GUNICORN_WORKERS} \
+    --worker-class sync \
+    --bind 127.0.0.1:8000 \
+    --timeout ${GUNICORN_TIMEOUT} \
+    --access-logfile /var/log/geocrop/access.log \
+    --error-logfile  /var/log/geocrop/error.log \
+    geo_crop.wsgi:application
+
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
