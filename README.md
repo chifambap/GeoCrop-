@@ -10,10 +10,9 @@ Developed at the **Zimbabwe National Geospatial and Space Agency (ZINGSA)**.
 
 | Diagram | Description |
 |---|---|
-| ![Mobile Architecture](docs/diagrams/02_mobile_app_architecture.png) | Mobile app layer stack |
-| ![Platform Link](docs/diagrams/03_platform_link.png) | Mobile ↔ platform integration |
-| ![Sync Sequence](docs/diagrams/05_offline_sync_sequence_uml.png) | Offline sync protocol (push-then-pull, UUID deduplication) |
-| ![Deployment](docs/diagrams/04_production_deployment_topology.png) | Production deployment topology |
+| ![Mobile Architecture](docs/diagrams/MobileArchitecture.png) | Mobile app layer stack |
+| ![Sync Sequence](docs/diagrams/offline-sync-sequence.png) | Offline sync protocol (push-then-pull, UUID deduplication) |
+| ![Deployment](docs/diagrams/production_deployment_topology.png) | Production deployment topology |
 
 ---
 
