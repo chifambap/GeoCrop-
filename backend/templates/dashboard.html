@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<link rel="icon" type="image/png" href="/static/logo/zingsa_logo.png" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="robots" content="noindex, nofollow"/>
+<title>GeoCrop Dashboard</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --earth:#2d6a28;--earth-dk:#1a4517;--earth-lt:#4a9e44;
+  --sky:#2980b9;--warn:#e67e22;--danger:#c0392b;
+  --bg:#f2f6f1;--surface:#ffffff;--surface2:#eaf2e8;
+  --border:#cfe0cc;--txt:#1a2818;--txt2:#5a7255;
+  --shadow:rgba(26,69,23,.1);
+  --r:12px;--r-sm:8px;
+  --font:'Sora',sans-serif;--mono:'DM Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--txt);font-size:14px;line-height:1.6;min-height:100vh}
+
+/* HEADER */
+.dash-header{
+  background:linear-gradient(110deg,var(--earth-dk),var(--earth),var(--earth-lt));
+  color:#fff;padding:1.2rem 2rem;display:flex;align-items:center;gap:1rem;
+  box-shadow:0 2px 16px rgba(0,0,0,.2)
+}
+.dash-header h1{font-size:1.3rem;font-weight:700;flex:1}
+.dash-header p{font-size:.75rem;opacity:.8}
+
+/* LAYOUT */
+.container{max-width:1400px;margin:0 auto;padding:1.5rem}
+
+/* STAT CARDS */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:1.5rem}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.2rem;text-align:center;box-shadow:0 1px 4px var(--shadow)}
+.stat-card .val{font-size:2rem;font-weight:700;color:var(--earth);line-height:1}
+.stat-card .lbl{font-size:.72rem;color:var(--txt2);text-transform:uppercase;letter-spacing:.06em;margin-top:.3rem}
+.stat-card.accent .val{color:var(--sky)}
+.stat-card.danger .val{color:var(--danger)}
+
+/* GRID */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem}
+@media(max-width:900px){.grid-2{grid-template-columns:1fr}}
+
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1.2rem;box-shadow:0 1px 4px var(--shadow);margin-bottom:1.5rem}
+.card-title{font-size:.78rem;font-weight:700;color:var(--txt2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:1rem;display:flex;align-items:center;gap:.4rem}
+
+/* MAP */
+#dash-map{height:420px;border-radius:var(--r);border:1px solid var(--border);margin-bottom:0}
+
+/* TABLE */
+.table-wrap{overflow-x:auto;max-height:500px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:.8rem}
+thead{position:sticky;top:0;z-index:1}
+th{background:var(--earth);color:#fff;padding:.65rem .7rem;text-align:left;font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em}
+td{padding:.55rem .7rem;border-bottom:1px solid var(--border);white-space:nowrap}
+tr:hover td{background:var(--surface2)}
+.badge{display:inline-block;padding:.15rem .45rem;border-radius:8px;font-size:.65rem;font-weight:700;text-transform:uppercase}
+.badge-ok{background:#e8f5e9;color:#2e7d32}
+.badge-err{background:#ffebee;color:#b71c1c}
+.badge-warn{background:#fff3e0;color:#bf360c}
+.badge-grey{background:#f5f5f5;color:#616161}
+
+/* CHART */
+.chart-bar{display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem}
+.chart-label{width:110px;font-size:.76rem;font-weight:600;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chart-fill-wrap{flex:1;background:var(--surface2);border-radius:6px;height:22px;overflow:hidden}
+.chart-fill{height:100%;background:linear-gradient(90deg,var(--earth-lt),var(--earth));border-radius:6px;transition:width .4s ease;min-width:2px}
+.chart-count{font-size:.72rem;color:var(--txt2);font-family:var(--mono);width:30px}
+
+/* FILTERS */
+.filters{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center}
+.filters select,.filters input{padding:.5rem .7rem;border:1.5px solid var(--border);border-radius:var(--r-sm);font-family:var(--font);font-size:.82rem;background:var(--surface);color:var(--txt);outline:none}
+.filters select:focus,.filters input:focus{border-color:var(--earth)}
+.export-btn{padding:.5rem .8rem;border:1.5px solid var(--border);border-radius:var(--r-sm);background:var(--surface2);font-family:var(--font);font-size:.78rem;font-weight:600;color:var(--txt);cursor:pointer;transition:.2s}
+.export-btn:hover{background:var(--earth);color:#fff;border-color:var(--earth)}
+
+/* LOGIN */
+.login-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(4px)}
+.login-box{background:var(--surface);border-radius:var(--r);width:min(400px,90%);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.login-head{background:linear-gradient(110deg,var(--earth-dk),var(--earth),var(--earth-lt));color:#fff;padding:1.2rem 1.5rem}
+.login-head h2{font-size:1.1rem;font-weight:700}
+.login-body{padding:1.5rem}
+.login-body .f{position:relative;margin-bottom:.8rem}
+.login-body input{width:100%;padding:.85rem .7rem .3rem;border:1.5px solid var(--border);border-radius:var(--r-sm);background:var(--surface2);font-family:var(--font);font-size:.85rem;color:var(--txt);outline:none}
+.login-body input:focus{border-color:var(--earth)}
+.login-body label{position:absolute;left:.7rem;top:.88rem;font-size:.83rem;color:var(--txt2);pointer-events:none;transition:.18s}
+.login-body input:focus+label,.login-body input:not(:placeholder-shown)+label{top:.18rem;font-size:.62rem;color:var(--earth);font-weight:700}
+.login-btn{width:100%;background:var(--earth);color:#fff;border:none;padding:.85rem;border-radius:var(--r-sm);font-size:.88rem;font-weight:700;cursor:pointer;font-family:var(--font)}
+.login-btn:hover{background:var(--earth-dk)}
+.login-error{background:#fee;border:1.5px solid #c33;color:#a11;padding:.6rem .8rem;border-radius:var(--r-sm);font-size:.77rem;margin-bottom:.8rem;display:none}
+.login-error.show{display:block}
+
+.refresh-btn{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:20px;padding:.4rem 1rem;font-size:.76rem;font-weight:600;cursor:pointer;font-family:var(--font);display:inline-flex;align-items:center;gap:.35rem}
+.refresh-btn:hover{background:rgba(255,255,255,.3)}
+.refresh-btn:disabled{opacity:.6;cursor:not-allowed}
+.header-btn{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:20px;padding:.4rem 1rem;font-size:.76rem;font-weight:600;cursor:pointer;font-family:var(--font);text-decoration:none;display:inline-flex;align-items:center;gap:.35rem;white-space:nowrap}
+.header-btn:hover{background:rgba(255,255,255,.3);color:#fff}
+.logout-btn{background:rgba(192,57,43,.35);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:20px;padding:.4rem 1rem;font-size:.76rem;font-weight:600;cursor:pointer;font-family:var(--font);display:inline-flex;align-items:center;gap:.35rem}
+.logout-btn:hover{background:rgba(192,57,43,.65)}
+.user-pill{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:20px;padding:.35rem .9rem;font-size:.78rem;font-weight:600;display:flex;align-items:center;gap:.4rem;white-space:nowrap}
+.header-actions{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+</style>
+</head>
+<body>
+
+<!-- LOGIN OVERLAY -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-box">
+    <div class="login-head"><h2>🔐 Dashboard Login</h2></div>
+    <div class="login-body">
+      <div class="login-error" id="login-error"></div>
+      <form onsubmit="dashLogin(event)">
+        <div class="f"><input type="text" id="l-user" placeholder=" " required/><label>Username</label></div>
+        <div class="f"><input type="password" id="l-pass" placeholder=" " required/><label>Password</label></div>
+        <button type="submit" class="login-btn" id="l-btn">Login</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<div class="dash-header">
+  <div><img src="/static/logo/zingsa_logo.png" alt="ZINGSA" style="width:40px;height:40px;border-radius:10px"></div>
+  <div style="flex:1">
+    <h1>GeoCrop Dashboard</h1>
+    <p>Field Data Collection Overview</p>
+  </div>
+  <div class="header-actions">
+    <div class="user-pill" id="dash-user-pill" style="display:none">
+      <span>👤</span><span id="dash-user"></span>
+    </div>
+    <a href="/gcp-manage-portal-internal-developer-access-gateway/" class="header-btn" target="_blank" title="Django Admin Backend">⚙️ Admin</a>
+    <a href="/GeoCrop.html" class="header-btn" target="_blank" title="Open GeoCrop App">📝 GeoCrop</a>
+    <button class="refresh-btn" id="refresh-btn" onclick="doRefresh(this)">🔄 Refresh</button>
+    <button class="logout-btn" id="logout-btn" style="display:none" onclick="doLogout()">🚪 Logout</button>
+  </div>
+</div>
+
+<!-- CONTENT -->
+<div class="container" id="main-content" style="display:none">
+
+  <!-- STATS -->
+  <div class="stats-row" id="stats-row">
+    <div class="stat-card"><div class="val" id="st-total">—</div><div class="lbl">Total Entries</div></div>
+    <div class="stat-card accent"><div class="val" id="st-validated">—</div><div class="lbl">Validated</div></div>
+    <div class="stat-card"><div class="val" id="st-polygons">—</div><div class="lbl">Polygons</div></div>
+    <div class="stat-card"><div class="val" id="st-points">—</div><div class="lbl">Points</div></div>
+    <div class="stat-card badge-ok"><div class="val" id="st-correct">—</div><div class="lbl">✅ Correct</div></div>
+    <div class="stat-card danger"><div class="val" id="st-incorrect">—</div><div class="lbl">🚫 Incorrect</div></div>
+  </div>
+
+  <!-- PENDING REGISTRATIONS (admin only) -->
+  <div class="card" id="pending-regs-card" style="display:none;margin-bottom:1.2rem">
+    <div class="card-title">👥 Pending Registration Requests</div>
+    <div id="pending-regs-list" style="font-size:.82rem">Loading…</div>
+  </div>
+
+  <div class="grid-2">
+    <!-- MAP -->
+    <div class="card">
+      <div class="card-title">🗺️ Collected Fields Map</div>
+      <div id="dash-map"></div>
+    </div>
+
+    <!-- CROP CHART -->
+    <div class="card">
+      <div class="card-title">📊 Crop Distribution</div>
+      <div id="crop-chart"></div>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="card">
+    <div class="card-title">📋 Field Entries</div>
+    <div class="filters">
+      <select id="f-survey" onchange="renderTable()"><option value="">All Surveys</option></select>
+      <select id="f-crop" onchange="renderTable()"><option value="">All Crops</option></select>
+      <select id="f-status" onchange="renderTable()">
+        <option value="">All Statuses</option>
+        <option value="correct">✅ Correct</option>
+        <option value="incorrect">❌ Incorrect</option>
+        <option value="uncertain">❓ Uncertain</option>
+        <option value="none">Unvalidated</option>
+      </select>
+      <input type="text" id="f-search" placeholder="🔍 Search…" oninput="renderTable()"/>
+      <div style="flex:1"></div>
+      <button class="export-btn" onclick="exportData('geojson')">📄 GeoJSON</button>
+      <button class="export-btn" onclick="exportData('kml')">🌍 KML</button>
+      <button class="export-btn" onclick="exportData('gpkg')">📦 GPKG</button>
+      <button class="export-btn" onclick="exportData('shp')">🗂️ Shapefile</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Survey</th><th>Crop</th><th>Sector</th><th>Season</th><th>Growth</th>
+            <th>Condition</th><th>Irrigation</th><th>Planting</th><th>Area (ha)</th><th>Seed (kg)</th><th>Fertiliser (kg)</th><th>Yield (t)</th><th>Collector</th>
+            <th>Date</th><th>Type</th><th>Validation</th><th>Photos</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const CROP_COLORS = {
+  maize:'#f97316',tobacco:'#6b7280',sesame:'#d4d4d8',sorghum:'#d97706',
+  cotton:'#cbd5e1',pearl_millet:'#78716c',groundnut:'#b45309',soyabean:'#8b5cf6',
+  finger_millet:'#a8a29e',potato:'#92400e',sunflower:'#eab308',tea:'#65a30d',
+  pepper:'#dc2626',roundnut:'#d97706',sugarcane:'#10b981',cabbage:'#84cc16',
+  banana:'#fde047',tomato:'#ef4444',sugarbean:'#c026d3',macademia:'#78350f',
+  bambaranuts:'#fcd34d',cowpea:'#4ade80',paprika:'#ea580c',rice:'#3b82f6',
+  cassava:'#9a3412',chick_pea:'#facc15',pigeon_pea:'#a3e635',summer_wheat:'#f4c430',
+  caster_beans:'#57534e',cocoyam:'#a855f7',tsenza:'#d946ef',
+  wheat:'#d4a017',barley:'#b8860b',pea:'#22c55e',other:'#64748b'
+};
+const CROP_EMOJI = {
+  maize:'🌽',tobacco:'🍃',sesame:'🌿',sorghum:'🌾',cotton:'☁️',pearl_millet:'🌾',
+  groundnut:'🥜',soyabean:'🫘',finger_millet:'🌾',potato:'🥔',sunflower:'🌻',
+  tea:'🍵',pepper:'🌶️',roundnut:'🥜',sugarcane:'🎋',cabbage:'🥬',banana:'🍌',
+  tomato:'🍅',sugarbean:'🫘',macademia:'🌰',bambaranuts:'🥜',cowpea:'🫛',
+  paprika:'🌶️',rice:'🍚',cassava:'🍠',chick_pea:'🫘',pigeon_pea:'🫛',
+  summer_wheat:'🌾',caster_beans:'🫘',cocoyam:'🍠',tsenza:'🍠',
+  wheat:'🌾',barley:'🌾',pea:'🫛',other:'🌿'
+};
+
+const _isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+const API_BASE = _isLocal
+  ? `http://${window.location.hostname}:8001/api`
+  : `${window.location.protocol}//${window.location.hostname}/api`;
+let token = null;
+let allEntries = [];
+let allSurveys = [];
+let dashMap = null;
+
+// ─── LOGIN ──────────────────────────────────────────────────────────
+async function dashLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('l-btn');
+  btn.disabled = true; btn.textContent = 'Logging in…';
+  const errEl = document.getElementById('login-error');
+  errEl.classList.remove('show');
+
+  try {
+    const res = await fetch(`${API_BASE}/auth/login/`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        username: document.getElementById('l-user').value,
+        password: document.getElementById('l-pass').value
+      })
+    });
+    if (!res.ok) { const d = await res.json().catch(()=>({})); throw new Error(d.detail||'Login failed'); }
+    const data = await res.json();
+    // Only admin role can access the dashboard
+    if (data.user.role !== 'admin') {
+      throw new Error('Access denied — admin role required');
+    }
+    token = data.access;
+    sessionStorage.setItem('dash_token', token);
+    sessionStorage.setItem('dash_role', data.user.role);
+    sessionStorage.setItem('dash_user', data.user.username);
+    showLoggedIn(data.user.username);
+    loadAll();
+  } catch(err) {
+    errEl.textContent = err.message;
+    errEl.classList.add('show');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Login';
+  }
+}
+
+// ─── Check stored token ─────────────────────────────────────────────
+(function init() {
+  const t = sessionStorage.getItem('dash_token');
+  const r = sessionStorage.getItem('dash_role');
+  const u = sessionStorage.getItem('dash_user');
+  if (t && r === 'admin') {
+    token = t;
+    showLoggedIn(u || 'Admin');
+    loadAll();
+  } else {
+    sessionStorage.removeItem('dash_token');
+    sessionStorage.removeItem('dash_role');
+    sessionStorage.removeItem('dash_user');
+  }
+})();
+
+// ─── LOAD ALL DATA ──────────────────────────────────────────────────
+async function loadAll() {
+  try {
+    const [statsRes, geojsonRes, entriesRes, surveysRes] = await Promise.all([
+      apiFetch('/fields/stats/'),
+      apiFetch('/fields/geojson/'),
+      apiFetch('/fields/?page_size=1000'),
+      apiFetch('/surveys/')
+    ]);
+    renderStats(statsRes);
+    renderMap(geojsonRes);
+    renderCropChart(statsRes.by_crop);
+
+    allEntries = entriesRes.results || entriesRes;
+    allSurveys = surveysRes.results || surveysRes;
+    populateSurveyFilter();
+    populateCropFilter();
+    renderTable();
+    loadPendingRegistrations();
+  } catch(e) {
+    console.error('Load error:', e);
+    if (e.message.includes('401')) {
+      sessionStorage.removeItem('dash_token');
+      document.getElementById('login-overlay').style.display = 'flex';
+      document.getElementById('main-content').style.display = 'none';
+    }
+  }
+}
+
+async function apiFetch(path, opts = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...opts,
+    headers: {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      ...(opts.headers || {}),
+    }
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
+}
+
+// ─── STATS ──────────────────────────────────────────────────────────
+function renderStats(s) {
+  document.getElementById('st-total').textContent = s.total;
+  document.getElementById('st-validated').textContent = s.validated;
+  document.getElementById('st-polygons').textContent = s.polygons;
+  document.getElementById('st-points').textContent = s.points;
+  document.getElementById('st-correct').textContent = s.validation_breakdown.correct;
+  document.getElementById('st-incorrect').textContent = s.validation_breakdown.incorrect;
+}
+
+// ─── MAP ────────────────────────────────────────────────────────────
+function renderMap(geojson) {
+  if (!dashMap) {
+    dashMap = L.map('dash-map').setView([-19.0, 29.15], 7);
+    L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+      attribution:'© Google', maxZoom:21, subdomains:['0','1','2','3']
+    }).addTo(dashMap);
+  }
+
+  // Clear old layers
+  dashMap.eachLayer(l => { if (l.feature) dashMap.removeLayer(l); });
+
+  if (geojson.features && geojson.features.length) {
+    const geoLayer = L.geoJSON(geojson, {
+      style: f => ({
+        color: CROP_COLORS[f.properties.crop_type] || '#64748b',
+        fillColor: CROP_COLORS[f.properties.crop_type] || '#64748b',
+        fillOpacity: 0.3, weight: 2
+      }),
+      pointToLayer: (f, ll) => L.circleMarker(ll, {
+        radius: 7,
+        fillColor: CROP_COLORS[f.properties.crop_type] || '#64748b',
+        fillOpacity: 0.8, color: '#fff', weight: 2
+      }),
+      onEachFeature: (f, layer) => {
+        const p = f.properties;
+        const e = CROP_EMOJI[p.crop_type] || '🌿';
+        const val = p.validation
+          ? `<br>✅ ${p.validation.status} (${p.validation.confidence}⭐)`
+          : '<br><em>Unvalidated</em>';
+        layer.bindPopup(
+          `<b>${e} ${cap(p.crop_type)}</b><br>` +
+          `👤 ${p.collected_by || '?'}<br>` +
+          `📅 ${new Date(p.collected_at).toLocaleDateString()}` +
+          val
+        );
+      }
+    }).addTo(dashMap);
+    dashMap.fitBounds(geoLayer.getBounds(), {padding: [30, 30]});
+  }
+}
+
+// ─── CROP CHART ─────────────────────────────────────────────────────
+function renderCropChart(byCrop) {
+  const el = document.getElementById('crop-chart');
+  if (!byCrop || !byCrop.length) {
+    el.innerHTML = '<div style="color:var(--txt2);font-size:.8rem;text-align:center;padding:2rem">No data yet</div>';
+    return;
+  }
+  const max = Math.max(...byCrop.map(c => c.count));
+  el.innerHTML = byCrop.map(c => {
+    const pct = Math.round(c.count / max * 100);
+    const emoji = CROP_EMOJI[c.crop_type] || '🌿';
+    const color = CROP_COLORS[c.crop_type] || '#64748b';
+    return `<div class="chart-bar">
+      <div class="chart-label">${emoji} ${cap(c.crop_type)}</div>
+      <div class="chart-fill-wrap">
+        <div class="chart-fill" style="width:${pct}%;background:linear-gradient(90deg,${color}88,${color})"></div>
+      </div>
+      <div class="chart-count">${c.count}</div>
+    </div>`;
+  }).join('');
+}
+
+// ─── TABLE ──────────────────────────────────────────────────────────
+function populateSurveyFilter() {
+  const sel = document.getElementById('f-survey');
+  sel.innerHTML = '<option value="">All Surveys</option>' +
+    allSurveys.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+}
+
+function populateCropFilter() {
+  const crops = [...new Set(allEntries.map(e => e.crop_type).filter(Boolean))].sort();
+  const sel = document.getElementById('f-crop');
+  sel.innerHTML = '<option value="">All Crops</option>' +
+    crops.map(c => `<option value="${c}">${(CROP_EMOJI[c]||'🌿')} ${cap(c)}</option>`).join('');
+}
+
+function renderTable() {
+  const surveyF = document.getElementById('f-survey').value;
+  const cropF = document.getElementById('f-crop').value;
+  const statusF = document.getElementById('f-status').value;
+  const searchF = document.getElementById('f-search').value.toLowerCase();
+
+  const filtered = allEntries.filter(e => {
+    if (surveyF && String(e.survey) !== surveyF) return false;
+    if (cropF && e.crop_type !== cropF) return false;
+    if (statusF === 'none' && e.validation) return false;
+    if (statusF === 'none' && !e.validation) return true;
+    if (statusF && statusF !== 'none' && (!e.validation || e.validation.status !== statusF)) return false;
+    if (searchF) {
+      const hay = [e.crop_type, e.notes, e.collected_by_name, e.season, e.growth_stage].join(' ').toLowerCase();
+      if (!hay.includes(searchF)) return false;
+    }
+    return true;
+  });
+
+  const tbody = document.getElementById('table-body');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="18" style="text-align:center;color:var(--txt2);padding:2rem">No entries found</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map((e, i) => {
+    const v = e.validation;
+    let vBadge = '<span class="badge badge-grey">—</span>';
+    if (v) {
+      const cls = v.status==='correct'?'badge-ok':v.status==='incorrect'?'badge-err':'badge-warn';
+      vBadge = `<span class="badge ${cls}">${v.status} (${v.confidence}⭐)</span>`;
+    }
+    const surveyObj = e.survey ? allSurveys.find(s => s.id === e.survey) : null;
+    const surveyName = surveyObj ? surveyObj.name : '—';
+    return `<tr>
+      <td>${e.id}</td>
+      <td>${surveyName}</td>
+      <td>${(CROP_EMOJI[e.crop_type]||'🌿')} ${cap(e.crop_type)}</td>
+      <td>${(e.sector||'—').toUpperCase()}</td>
+      <td>${cap(e.season||'—')}</td>
+      <td>${cap(e.growth_stage||'—')}</td>
+      <td>${cap((e.crop_condition||'—').replace('_',' '))}</td>
+      <td>${cap(e.irrigation||'—')}</td>
+      <td>${e.planting_date||'—'}</td>
+      <td>${e.area_ha!=null ? e.area_ha : '—'}</td>
+      <td>${e.seed_used_kg!=null ? e.seed_used_kg : '—'}</td>
+      <td>${e.fertiliser_used_kg!=null ? e.fertiliser_used_kg : '—'}</td>
+      <td>${e.yield_tonnes!=null ? e.yield_tonnes : '—'}</td>
+      <td>👤 ${e.collected_by_name||'?'}</td>
+      <td>${new Date(e.collected_at).toLocaleDateString()}</td>
+      <td>${e.geometry_type||'?'}</td>
+      <td>${vBadge}</td>
+      <td>${e.photos?.length||0} 📷</td>
+    </tr>`;
+  }).join('');
+}
+
+function cap(s) { return s ? s.charAt(0).toUpperCase()+s.slice(1) : ''; }
+
+function exportData(fmt) {
+  const surveyF = document.getElementById('f-survey').value;
+  const cropF = document.getElementById('f-crop').value;
+  const statusF = document.getElementById('f-status').value;
+  const url = new URL(`${API_BASE}/fields/export/`);
+  url.searchParams.set('export_format', fmt);
+  if (surveyF) url.searchParams.set('survey', surveyF);
+  url.searchParams.set('crop_type', cropF);
+  url.searchParams.set('status', statusF);
+  url.searchParams.set('token', token);
+  window.open(url.toString(), '_blank');
+}
+
+// ─── PENDING REGISTRATIONS ─────────────────────────────────────────
+async function loadPendingRegistrations() {
+  const card = document.getElementById('pending-regs-card');
+  const list = document.getElementById('pending-regs-list');
+  try {
+    const regs = await apiFetch('/auth/registrations/pending/');
+    if (!regs.length) { card.style.display = 'none'; return; }
+    card.style.display = 'block';
+    list.innerHTML = regs.map(r => `
+      <div style="display:flex;align-items:center;gap:.8rem;padding:.6rem 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600">👤 ${r.username}</div>
+          <div style="font-size:.75rem;color:var(--txt2)">
+            ${r.email} · ${r.organisation || 'No org'} · ${new Date(r.created_at).toLocaleDateString()}
+          </div>
+        </div>
+        <button onclick="approveReg(${r.id})" style="padding:.3rem .8rem;font-size:.75rem;background:var(--earth);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">✅ Approve</button>
+        <button onclick="rejectReg(${r.id})" style="padding:.3rem .8rem;font-size:.75rem;background:var(--danger);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">❌ Reject</button>
+      </div>
+    `).join('');
+  } catch(e) {
+    card.style.display = 'none';
+  }
+}
+
+function showLoggedIn(username) {
+  document.getElementById('dash-user').textContent = username;
+  document.getElementById('dash-user-pill').style.display = 'flex';
+  document.getElementById('logout-btn').style.display = 'inline-flex';
+  document.getElementById('login-overlay').style.display = 'none';
+  document.getElementById('main-content').style.display = 'block';
+}
+
+function doLogout() {
+  sessionStorage.removeItem('dash_token');
+  sessionStorage.removeItem('dash_role');
+  sessionStorage.removeItem('dash_user');
+  token = null; allEntries = []; allSurveys = [];
+  document.getElementById('dash-user-pill').style.display = 'none';
+  document.getElementById('logout-btn').style.display = 'none';
+  document.getElementById('login-overlay').style.display = 'flex';
+  document.getElementById('main-content').style.display = 'none';
+}
+
+async function doRefresh(btn) {
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Loading…';
+  try { await loadAll(); } finally {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+}
+
+async function approveReg(id) {
+  if (!confirm('Approve this registration?')) return;
+  try {
+    const res = await apiFetch(`/auth/registrations/${id}/approve/`, { method: 'POST' });
+    alert(res.detail);
+    loadPendingRegistrations();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function rejectReg(id) {
+  if (!confirm('Reject and delete this registration?')) return;
+  try {
+    const res = await apiFetch(`/auth/registrations/${id}/reject/`, { method: 'POST' });
+    alert(res.detail);
+    loadPendingRegistrations();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+</script>
+<script>
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('keydown', e => {
+  if (e.key === 'F12' ||
+      (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key)) ||
+      (e.ctrlKey && e.key === 'u')) {
+    e.preventDefault();
+  }
+});
+document.addEventListener('selectstart', e => {
+  if (!['INPUT','TEXTAREA'].includes(e.target.tagName)) e.preventDefault();
+});
+</script>
+</body>
+</html>
